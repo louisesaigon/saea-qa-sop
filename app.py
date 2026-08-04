@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 사이드바 라디오 버튼 텍스트 줄바꿈 및 간격 최적화 CSS
+# 사이드바 라디오 버튼 스타일 최적화 (텍스트 줄바꿈 및 간격)
 st.markdown("""
     <style>
     .stRadio > div {
@@ -27,62 +27,58 @@ st.markdown("""
 
 assets_dir = os.path.join(os.path.dirname(__file__), "assets")
 
-# --- 이미지 소스 기반 100% 일치 목차 목록 (1~45번 + 부록 1~5번) ---
+# 목차 목록 (옆에 P.1 등 페이지 번호 완전 제거)
 SOP_TOC = [
-    # 1~14번
-    {"num": "1", "title": "1. 머리말", "page": 1},
-    {"num": "2", "title": "2. QA/QC 정의", "page": 1},
-    {"num": "3", "title": "3. AQL (Acceptable Quality Limit)", "page": 2},
-    {"num": "4", "title": "4. Sae-A DCL (Defect Classification List)", "page": 4},
-    {"num": "5", "title": "5. 원단 검사/4point System", "page": 6},
-    {"num": "6", "title": "6. 원단 방단", "page": 7},
-    {"num": "7", "title": "7. 부자재 검사", "page": 10},
-    {"num": "8", "title": "8. 패턴 조정 절차 및 관리", "page": 13},
-    {"num": "9", "title": "9. PPM Workflow Chart", "page": 16},
-    {"num": "10", "title": "10. PP Sample 제작", "page": 18},
-    {"num": "11", "title": "11. Internal PPM", "page": 19},
-    {"num": "12", "title": "12. PPM", "page": 21},
-    {"num": "13", "title": "13. 연단 및 마커 검사", "page": 23},
-    {"num": "14", "title": "14. 재단물 검사", "page": 25},
-    # 15~29번 (이미지 기준 정확 수정)
-    {"num": "15", "title": "15. 자수/프린트 검사", "page": 27},
-    {"num": "16", "title": "16. Pilot Run 검사", "page": 29},
-    {"num": "17", "title": "17. Wear & Wash Test", "page": 31},
-    {"num": "18", "title": "18. 1st Output 검사", "page": 33},
-    {"num": "19", "title": "19. In-Process 검사", "page": 35},
-    {"num": "20", "title": "20. Seam allowance 모니터링", "page": 37},
-    {"num": "21", "title": "21. In-line 검사", "page": 39},
-    {"num": "22", "title": "22. End-line 검사", "page": 41},
-    {"num": "23", "title": "23. Finishing 검사", "page": 43},
-    {"num": "24", "title": "24. Dupro 검사", "page": 45},
-    {"num": "25", "title": "25. Pre-Final 검사", "page": 47},
-    {"num": "26", "title": "26. Final 검사", "page": 49},
-    {"num": "27", "title": "27. 바늘과 금속 오염 관리", "page": 51},
-    {"num": "28", "title": "28. 검침기 사용 설명", "page": 53},
-    {"num": "29", "title": "29. 검침기 청소 관리", "page": 55},
-    {"num": "30", "title": "30. 9 point Calibration", "page": 57},
-    # 31~45번 (이미지 기준 정확 수정)
-    {"num": "31", "title": "31. 핸드 검침기 사용법", "page": 59},
-    {"num": "32", "title": "32. 9 point Calibration", "page": 61},
-    {"num": "33", "title": "33. 부적격 자재 관리 CNCM(Control of Non-conforming Material)", "page": 63},
-    {"num": "34", "title": "34. CAPA(Corrective & Preventive Action Plan)", "page": 65},
-    {"num": "35", "title": "35. 열전사 라벨/심지 부착관리", "page": 67},
-    {"num": "36", "title": "36. Snap/Button 관리", "page": 69},
-    {"num": "37", "title": "37. Attachment Strength Test 방법 (Pulling Test)", "page": 71},
-    {"num": "38", "title": "38. 어린이 제품 안전", "page": 73},
-    {"num": "39", "title": "39. Carton/Garment 습도 관리", "page": 75},
-    {"num": "40", "title": "40. 곰팡이 발생 방지를 위한 현장 관리", "page": 77},
-    {"num": "41", "title": "41. Aqua Boy 수분 측정기 사용법", "page": 79},
-    {"num": "42", "title": "42. 잔사 불량 예방 및 관리", "page": 81},
-    {"num": "43", "title": "43. Virtual Inspection", "page": 83},
-    {"num": "44", "title": "44. Virtual FE", "page": 85},
-    {"num": "45", "title": "45. Risk Assessment Process Meeting", "page": 87},
-    # 부록 1~5번 (이미지 기준 정확 수정)
-    {"num": "App 1", "title": "부록1 Inspection Procedure (Production Test Plan)", "page": 90},
-    {"num": "App 2", "title": "부록2 FE Quick check list", "page": 95},
-    {"num": "App 3", "title": "부록3 Sewing Factory Self Assessment Report", "page": 100},
-    {"num": "App 4", "title": "부록4 Mold Prevention Checklist", "page": 105},
-    {"num": "App 5", "title": "부록5 Wear & Wash Test Report", "page": 110}
+    {"num": "1", "title": "1. 머리말", "keyword": "머리말"},
+    {"num": "2", "title": "2. QA/QC 정의", "keyword": "QA/QC 정의"},
+    {"num": "3", "title": "3. AQL (Acceptable Quality Limit)", "keyword": "AQL"},
+    {"num": "4", "title": "4. Sae-A DCL (Defect Classification List)", "keyword": "Defect Classification List"},
+    {"num": "5", "title": "5. 원단 검사/4point System", "keyword": "원단 검사"},
+    {"num": "6", "title": "6. 원단 방단", "keyword": "원단 방단"},
+    {"num": "7", "title": "7. 부자재 검사", "keyword": "부자재 검사"},
+    {"num": "8", "title": "8. 패턴 조정 절차 및 관리", "keyword": "패턴 조정"},
+    {"num": "9", "title": "9. PPM Workflow Chart", "keyword": "PPM Workflow"},
+    {"num": "10", "title": "10. PP Sample 제작", "keyword": "PP Sample"},
+    {"num": "11", "title": "11. Internal PPM", "keyword": "Internal PPM"},
+    {"num": "12", "title": "12. PPM", "keyword": "PPM"},
+    {"num": "13", "title": "13. 연단 및 마커 검사", "keyword": "연단 및 마커"},
+    {"num": "14", "title": "14. 재단물 검사", "keyword": "재단물 검사"},
+    {"num": "15", "title": "15. 자수/프린트 검사", "keyword": "자수"},
+    {"num": "16", "title": "16. Pilot Run 검사", "keyword": "Pilot Run"},
+    {"num": "17", "title": "17. Wear & Wash Test", "keyword": "Wear & Wash"},
+    {"num": "18", "title": "18. 1st Output 검사", "keyword": "1st Output"},
+    {"num": "19", "title": "19. In-Process 검사", "keyword": "In-Process"},
+    {"num": "20", "title": "20. Seam allowance 모니터링", "keyword": "Seam allowance"},
+    {"num": "21", "title": "21. In-line 검사", "keyword": "In-line 검사"},
+    {"num": "22", "title": "22. End-line 검사", "keyword": "End-line 검사"},
+    {"num": "23", "title": "23. Finishing 검사", "keyword": "Finishing 검사"},
+    {"num": "24", "title": "24. Dupro 검사", "keyword": "Dupro 검사"},
+    {"num": "25", "title": "25. Pre-Final 검사", "keyword": "Pre-Final"},
+    {"num": "26", "title": "26. Final 검사", "keyword": "Final 검사"},
+    {"num": "27", "title": "27. 바늘과 금속 오염 관리", "keyword": "바늘과 금속"},
+    {"num": "28", "title": "28. 검침기 사용 설명", "keyword": "검침기 사용"},
+    {"num": "29", "title": "29. 검침기 청소 관리", "keyword": "검침기 청소"},
+    {"num": "30", "title": "30. 9 point Calibration", "keyword": "9 point Calibration"},
+    {"num": "31", "title": "31. 핸드 검침기 사용법", "keyword": "핸드 검침기"},
+    {"num": "32", "title": "32. 9 point Calibration", "keyword": "Calibration"},
+    {"num": "33", "title": "33. 부적격 자재 관리 CNCM(Control of Non-conforming Material)", "keyword": "부적격 자재"},
+    {"num": "34", "title": "34. CAPA(Corrective & Preventive Action Plan)", "keyword": "CAPA"},
+    {"num": "35", "title": "35. 열전사 라벨/심지 부착관리", "keyword": "열전사 라벨"},
+    {"num": "36", "title": "36. Snap/Button 관리", "keyword": "Snap/Button"},
+    {"num": "37", "title": "37. Attachment Strength Test 방법 (Pulling Test)", "keyword": "Attachment Strength"},
+    {"num": "38", "title": "38. 어린이 제품 안전", "keyword": "어린이 제품"},
+    {"num": "39", "title": "39. Carton/Garment 습도 관리", "keyword": "습도 관리"},
+    {"num": "40", "title": "40. 곰팡이 발생 방지를 위한 현장 관리", "keyword": "곰팡이"},
+    {"num": "41", "title": "41. Aqua Boy 수분 측정기 사용법", "keyword": "Aqua Boy"},
+    {"num": "42", "title": "42. 잔사 불량 예방 및 관리", "keyword": "잔사 불량"},
+    {"num": "43", "title": "43. Virtual Inspection", "keyword": "Virtual Inspection"},
+    {"num": "44", "title": "44. Virtual FE", "keyword": "Virtual FE"},
+    {"num": "45", "title": "45. Risk Assessment Process Meeting", "keyword": "Risk Assessment"},
+    {"num": "App1", "title": "부록1 Inspection Procedure (Production Test Plan)", "keyword": "Inspection Procedure"},
+    {"num": "App2", "title": "부록2 FE Quick check list", "keyword": "Quick check list"},
+    {"num": "App3", "title": "부록3 Sewing Factory Self Assessment Report", "keyword": "Self Assessment"},
+    {"num": "App4", "title": "부록4 Mold Prevention Checklist", "keyword": "Mold Prevention"},
+    {"num": "App5", "title": "부록5 Wear & Wash Test Report", "keyword": "Test Report"}
 ]
 
 UI_LABELS = {
@@ -125,7 +121,6 @@ UI_LABELS = {
 }
 
 def find_main_sop_pdf(lang_code):
-    """3페이지 소형 PDF 제외, 145페이지 분량의 메인 SOP Handbook PDF 찾기"""
     if not os.path.exists(assets_dir):
         return None
     files = [f for f in os.listdir(assets_dir) if f.lower().endswith('.pdf')]
@@ -150,24 +145,56 @@ def load_pdf_data(pdf_filename):
     except Exception:
         return []
 
+def find_matching_page_index(pages_data, item_info, default_idx):
+    """목차 페이지(Contents)를 건너뛰고 해당 섹션이 실제로 시작하는 본문 페이지 탐색"""
+    keyword = item_info.get("keyword", "").lower()
+    if not keyword or not pages_data:
+        return default_idx
+
+    # 앞 3페이지(목차/표지 영역)를 제외하고 검색
+    start_search_page = 2 if len(pages_data) > 3 else 0
+
+    for idx in range(start_search_page, len(pages_data)):
+        page_text = pages_data[idx].lower()
+        if keyword in page_text:
+            return idx
+            
+    return default_idx
+
 def clean_and_format_text(raw_text):
-    """줄바꿈 문단 정돈 및 가독성 최적화"""
+    """점선 제거 및 단락 구분을 통한 가독성 대폭 향상"""
     if not raw_text.strip():
         return ""
+    
+    # 1. 점선 및 특수 연속 기호 완전 제거
     cleaned = re.sub(r'[\.·_]{2,}', '', raw_text)
+    
     lines = cleaned.split('\n')
-    formatted = []
+    formatted_paragraphs = []
     
     for line in lines:
         l = line.strip()
         if not l:
             continue
-        if any(l.startswith(kw) for kw in ["Doc. No.", "Version", "Date", "Prepared", "Approved", "Department", "Note", "Objective"]):
-            formatted.append(f"\n**{l}**\n")
-        else:
-            formatted.append(l)
             
-    return "\n".join(formatted)
+        # 2. 항목 번호, 주요 헤더 및 섹션 키워드 강하게 분리
+        is_header = any(l.startswith(kw) for kw in [
+            "Doc. No.", "Version", "Date", "Prepared", "Approved", 
+            "Department", "Note", "Objective", "Purpose", "Scope"
+        ]) or re.match(r'^\d+[\.\)]\s*', l) or re.match(r'^[가-하A-Z][\.\)]\s*', l)
+
+        if is_header:
+            formatted_paragraphs.append(f"\n\n### {l}\n")
+        else:
+            # 문장 마침표 뒤 단락 구분
+            l_formatted = re.sub(r'(\. )', '.\n\n', l)
+            formatted_paragraphs.append(l_formatted)
+            
+    result_text = " ".join(formatted_paragraphs)
+    # 불필요한 연속 개행 정리
+    result_text = re.sub(r'\n{3,}', '\n\n', result_text)
+    
+    return result_text.strip()
 
 @st.cache_data
 def translate_to_vietnamese(text):
@@ -196,13 +223,16 @@ with st.sidebar:
     
     st.markdown(f"**{labels['toc_header']}**")
     
-    # 1~45번 항목 + 부록 1~5번 항목 라디오 버튼으로 표시
-    toc_titles = [f"{item['title']} (P.{item['page']})" for item in SOP_TOC]
-    selected_label = st.radio("목차를 선택하세요:", toc_titles, index=0)
+    # 페이지 번호(P.1 등) 없이 깔끔한 목차 제목만 노출
+    toc_titles = [item['title'] for item in SOP_TOC]
+    selected_title = st.radio("목차를 선택하세요:", toc_titles, index=0)
     
-    selected_index = toc_titles.index(selected_label)
+    selected_index = toc_titles.index(selected_title)
     selected_item = SOP_TOC[selected_index]
-    target_page_num = selected_item["page"]
+    
+    # 본문 해당 페이지 자동 탐색
+    estimated_idx = selected_index + 2
+    matched_page_idx = find_matching_page_index(pages_data, selected_item, estimated_idx)
 
 # --- 2. 메인 화면 ---
 st.caption(f"{labels['manual_header']} ({lang_choice})")
@@ -221,7 +251,7 @@ if target_pdf and pages_data:
         if found_count == 0:
             st.warning("일치하는 매뉴얼 내용을 찾을 수 없습니다.")
     else:
-        page_idx = max(0, min(target_page_num - 1, len(pages_data) - 1))
+        page_idx = max(0, min(matched_page_idx, len(pages_data) - 1))
         raw_content = pages_data[page_idx]
         formatted_content = clean_and_format_text(raw_content)
         
@@ -234,7 +264,7 @@ if target_pdf and pages_data:
         else:
             display_content = formatted_content
 
-        st.markdown(f"#### {display_title}")
+        st.markdown(f"### 📖 {display_title}")
         
         with st.container(border=True):
             if display_content.strip():
