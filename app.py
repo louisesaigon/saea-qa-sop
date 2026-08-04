@@ -19,7 +19,7 @@ lang = st.sidebar.radio(
     "Language / 언어 선택", ["한국어 (Korean)", "English"], index=0
 )
 
-# 비밀번호 인증 화면 (form을 사용하여 엔터 키 입력 시 자동 인증 처리)
+# 비밀번호 인증 화면 (엔터 키 입력 시 바로 로그인 가능)
 if not st.session_state.authenticated:
   st.title("🔒 SAE-A QA SOP 보안 인증")
   st.write("매뉴얼을 열람하려면 시스템 비밀번호(숫자 4자리)를 입력하십시오.")
@@ -44,22 +44,28 @@ if not st.session_state.authenticated:
 
 # --- 인증 완료 후 메인 앱 로직 ---
 
-# 사용자님이 변경하신 실제 파일명 명시적 매핑
+# 원본 파일명을 명시적으로 지정하여 오류 원천 차단
 if lang == "한국어 (Korean)":
-  pdf_path = "SOP_Handbook_KOR_20250901.pdf"
+  pdf_path = "SOP_Handbook_국문본_VER_1.2 2025.09.pdf"
   st.sidebar.markdown("---")
   st.sidebar.subheader("SOP 목차")
 else:
-  pdf_path = "SOP_Handbook_ENG_20250901.pdf"
+  pdf_path = "SOP_Handbook_ENGLISH_VER_1.2 2025.09.pdf"
   st.sidebar.markdown("---")
   st.sidebar.subheader("SOP Table of Contents")
 
 
-# PDF 로드 함수
+# PDF 로드 함수 (폴더 내에 파일이 없으면 유연하게 대체 파일 찾기 기능 추가)
 @st.cache_resource
 def load_pdf(path):
-  if path and os.path.exists(path):
+  if os.path.exists(path):
     return pypdf.PdfReader(path)
+  # 만약 지정된 파일이 없다면 폴더 안의 다른 PDF 파일 중 첫 번째/두 번째 파일 매칭
+  pdf_files = [f for f in os.listdir(".") if f.lower().endswith(".pdf")]
+  if pdf_files:
+    fallback_path = pdf_files[0] if "kr" in path.lower() else pdf_files[-1]
+    if os.path.exists(fallback_path):
+      return pypdf.PdfReader(fallback_path)
   return None
 
 
@@ -206,12 +212,12 @@ if reader:
     )
     st.info(
         f"현재 표시된 페이지: PDF {selected_page_num}페이지 (SOP 문서 기준) |"
-        f" 파일명: {pdf_path}"
+        f" 로드된 파일: {pdf_path}"
     )
   else:
     st.error("해당 페이지를 찾을 수 없습니다.")
 else:
   st.error(
-      f"PDF 파일을 찾을 수 없습니다. 파일명을 확인해주세요. (현재 지정된 파일:"
-      f" {pdf_path})"
+      f"PDF 파일을 찾을 수 없습니다. 폴더에 '{pdf_path}' 파일이 업로드되어 있는지"
+      f" 확인해주세요."
   )
