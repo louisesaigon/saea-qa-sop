@@ -2,17 +2,27 @@ import streamlit as st
 import os
 from pypdf import PdfReader
 
-# 페이지 기본 설정 (모바일 모드 최적화)
 st.set_page_config(
     page_title="SAE-A QA SOP Manual",
     page_icon="📋",
     layout="centered"
 )
 
-# 자산 폴더 경로
 assets_dir = os.path.join(os.path.dirname(__file__), "assets")
 
-# PDF 텍스트 추출 함수 (캐싱 처리로 속도 향상)
+# assets 폴더에서 조건에 맞는 PDF 파일 찾아내기
+def find_matching_pdf(manual_key, lang_code):
+    if not os.path.exists(assets_dir):
+        return None
+    
+    files = os.listdir(assets_dir)
+    for file in files:
+        if file.lower().endswith(".pdf"):
+            # 매뉴얼 키워드 및 언어 코드 일치 여부 확인
+            if manual_key.lower() in file.lower() and lang_code.lower() in file.lower():
+                return file
+    return None
+
 @st.cache_data
 def extract_text_from_pdf(pdf_filename):
     pdf_path = os.path.join(assets_dir, pdf_filename)
@@ -30,42 +40,43 @@ def extract_text_from_pdf(pdf_filename):
     except Exception as e:
         return f"파일을 읽는 중 오류가 발생했습니다: {e}"
 
-# --- 헤더 영역 ---
+# --- 헤더 ---
 st.title("📋 SAE-A QA SOP")
 st.caption("모바일 최적화 텍스트 매뉴얼")
 
-# --- 언어 / 매뉴얼 선택 ---
+# --- 언어 선택 ---
 lang = st.radio("🌐 언어 선택 / Select Language", ["한국어", "English", "Tiếng Việt"], horizontal=True)
-
-# 언어 코드 매핑
 lang_map = {"한국어": "KO", "English": "EN", "Tiếng Việt": "VI"}
 lang_code = lang_map.get(lang, "KO")
 
-# 매뉴얼 종류 선택 (드롭다운/셀렉트박스로 모바일 터치 편의성 확보)
+# --- 매뉴얼 선택 ---
 manual_type = st.selectbox(
     "📚 매뉴얼 종류 선택",
     ["SOP Handbook", "Wear & Wash SOP", "Fleece SOP"]
 )
 
-# 매뉴얼 파일명 결정
-if manual_type == "Wear & Wash SOP":
-    target_file = f"SOP_WearWash_{lang_code}_20260630.pdf"
-elif manual_type == "Fleece SOP":
-    target_file = f"SOP_Fleece_{lang_code}_20260630.pdf"
-else:
-    target_file = f"SOP_Handbook_{lang_code}_20250901.pdf"
+# 매뉴얼 키워드 매핑
+key_map = {
+    "SOP Handbook": "Handbook",
+    "Wear & Wash SOP": "Wear",
+    "Fleece SOP": "Fleece"
+}
+target_key = key_map.get(manual_type, "Handbook")
 
 st.markdown("---")
 
-# --- 텍스트 매뉴얼 출력 영역 ---
+# --- 파일 검색 및 출력 ---
 st.subheader(f"📖 {manual_type} ({lang})")
 
-with st.spinner("매뉴얼 텍스트를 불러오는 중입니다..."):
-    pdf_text = extract_text_from_pdf(target_file)
+matched_file = find_matching_pdf(target_key, lang_code)
 
-if pdf_text:
-    # 모바일에서 읽기 편하도록 깔끔한 컨테이너 카드 형태로 텍스트 출력
-    with st.container():
+if matched_file:
+    with st.spinner("매뉴얼 텍스트를 불러오는 중입니다..."):
+        pdf_text = extract_text_from_pdf(matched_file)
+    
+    if pdf_text:
         st.markdown(pdf_text)
+    else:
+        st.warning("PDF 파일에서 텍스트를 추출하지 못했습니다.")
 else:
-    st.error(f"⚠️ 매뉴얼 파일(`{target_file}`)을 찾을 수 없습니다. `assets` 폴더를 확인해 주세요.")
+    st.error(f"⚠️ `{target_key}` 관련 `{lang_code}` 매뉴얼 PDF 파일을 `assets` 폴더에서 찾을 수 없습니다.")
