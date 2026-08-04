@@ -32,20 +32,48 @@ if not st.session_state.authenticated:
       st.session_state.authenticated = True
       st.rerun()
     else:
-      st.error(
-          "비밀번호가 틀렸습니다. (힌트: 0101)"
-      )  # 비밀번호: 0101 고정 요청 반영
+      st.error("비밀번호가 틀렸습니다. (힌트: 0101)")
   st.stop()
 
 # --- 인증 완료 후 메인 앱 로직 ---
 
-# 언어별 PDF 파일 경로 설정
+# 현재 디렉토리의 파일들을 스캔하여 올바른 PDF 파일을 자동으로 찾기
+files = os.listdir(".")
+
+
+def find_pdf(lang_type):
+  for f in files:
+    if f.lower().endswith(".pdf"):
+      if lang_type == "kr" and (
+          "국문" in f or "kr" in f.lower() or "korean" in f.lower()
+      ):
+        return f
+      if lang_type == "en" and (
+          "english" in f.lower()
+          or "en" in f.lower()
+          or "eng" in f.lower()
+          or "global" in f.lower()
+      ):
+        return f
+  # 차선책: 이름으로 못 찾으면 대략적인 매칭
+  pdf_files = [f for f in files if f.lower().endswith(".pdf")]
+  if len(pdf_files) >= 2:
+    return pdf_files[0] if lang_type == "kr" else pdf_files[1]
+  elif len(pdf_files) == 1:
+    return pdf_files[0]
+  return None
+
+
 if lang == "한국어 (Korean)":
-  pdf_path = "SOP_Handbook_국문본_VER_1.2 2025.09.pdf"
+  pdf_path = find_pdf("kr")
+  if not pdf_path:
+    pdf_path = "SOP_Handbook_국문본_VER_1.2 2025.09.pdf"  # 기본값 fallback
   st.sidebar.markdown("---")
   st.sidebar.subheader("SOP 목차")
 else:
-  pdf_path = "SOP_Handbook_ENGLISH_VER_1.2 2025.09.pdf"
+  pdf_path = find_pdf("en")
+  if not pdf_path:
+    pdf_path = "SOP_Handbook_ENGLISH_VER_1.2 2025.09.pdf"  # 기본값 fallback
   st.sidebar.markdown("---")
   st.sidebar.subheader("SOP Table of Contents")
 
@@ -53,14 +81,14 @@ else:
 # PDF 로드 함수
 @st.cache_resource
 def load_pdf(path):
-  if os.path.exists(path):
+  if path and os.path.exists(path):
     return pypdf.PdfReader(path)
   return None
 
 
 reader = load_pdf(pdf_path)
 
-# 국문/영문 목차 및 실제 PDF 페이지 매칭 정의 (실제 문서 기준 페이지 번호 1원화 매핑)
+# 국문/영문 목차 및 실제 PDF 페이지 매칭 정의
 toc_data_kr = [
     ("1. 개요 (Overview)", 3),
     ("2. QA/QC 정의", 4),
@@ -164,7 +192,7 @@ toc_titles = [item[0] for item in toc_data]
 selected_title = st.sidebar.radio("목차를 선택하세요:", toc_titles)
 
 # 선택된 항목의 실제 PDF 페이지 번호 매핑 찾기
-selected_page_num = 3  # 기본값
+selected_page_num = 3
 for title, p_num in toc_data:
   if title == selected_title:
     selected_page_num = p_num
@@ -190,12 +218,9 @@ else:
 
 # PDF 페이지 텍스트 추출 및 표시
 if reader:
-  # PDF 페이지 번호는 0부터 시작하므로 -1 처리
   target_idx = max(0, selected_page_num - 1)
   if target_idx < len(reader.pages):
     page_text = reader.pages[target_idx].extract_text()
-
-    # 텍스트 박스로 보기 쉽게 출력 (또는 이미지 변환 렌더링 가능)
     st.text_area(
         "SOP Manual Content / 매뉴얼 내용",
         page_text,
@@ -203,11 +228,13 @@ if reader:
         disabled=True,
     )
     st.info(
-        f"현재 표시된 페이지: PDF {selected_page_num}페이지 (SOP 문서 기준)"
+        f"현재 표시된 페이지: PDF {selected_page_num}페이지 (SOP 문서 기준) |"
+        f" 파일명: {pdf_path}"
     )
   else:
     st.error("해당 페이지를 찾을 수 없습니다.")
 else:
   st.error(
-      f"PDF 파일을 찾을 수 없습니다. 경로를 확인해주세요: {pdf_path}"
+      f"PDF 파일을 찾을 수 없습니다. 폴더 내 파일명과 일치하는지 확인해주세요."
+      f" (인식된 경로: {pdf_path})"
   )
