@@ -44,22 +44,35 @@ if not st.session_state.authenticated:
 
 # --- 인증 완료 후 메인 앱 로직 ---
 
-# 사용자님의 실제 파일명 반영
+# GitHub에 업로드되어 있는 실제 파일명과 정확히 매칭
 if lang == "한국어 (Korean)":
-  pdf_path = "SOP_Handbook_KOR_20250901.pdf"
+  pdf_path = "SOP_Handbook_국문본_VER_1.2 2025.09.pdf"
   st.sidebar.markdown("---")
   st.sidebar.subheader("SOP 목차")
 else:
-  pdf_path = "SOP_Handbook_ENG_20250901.pdf"
+  pdf_path = "SOP_Handbook_ENGLISH_VER_1.2 2025.09.pdf"
   st.sidebar.markdown("---")
   st.sidebar.subheader("SOP Table of Contents")
 
 
-# PDF 로드 함수
+# PDF 로드 함수 (혹시 모를 상황을 대비해 폴더 내 PDF 자동 검색 기능 포함)
 @st.cache_resource
-def load_pdf(path):
-  if os.path.exists(path):
-    return pypdf.PdfReader(path)
+def load_pdf(target_path):
+  if os.path.exists(target_path):
+    return pypdf.PdfReader(target_path)
+
+  # 지정된 이름의 파일이 없다면 폴더 내 PDF 파일들을 자동 스캔하여 대체
+  pdf_files = [f for f in os.listdir(".") if f.lower().endswith(".pdf")]
+  if pdf_files:
+    # 국문은 첫 번째, 영문은 두 번째 파일 우선 배정
+    fallback = (
+        pdf_files[0]
+        if "국문" in target_path or "kr" in target_path.lower()
+        else pdf_files[-1]
+    )
+    if os.path.exists(fallback):
+      return pypdf.PdfReader(fallback)
+    return pypdf.PdfReader(pdf_files[0])
   return None
 
 
