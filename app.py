@@ -2,7 +2,7 @@ import os
 import pypdf
 import streamlit as st
 
-# 1. 페이지 레이아웃 설정
+# 1. 페이지 설정
 st.set_page_config(
     page_title="SOP Smart Handbook - SAE-A", page_icon="🔒", layout="wide"
 )
@@ -17,7 +17,11 @@ lang = st.sidebar.radio(
     "Language / 언어 선택", ["한국어 (Korean)", "English"], index=0
 )
 
-# 4. 보안 인증 화면 (비밀번호: 0101, 엔터 입력 가능)
+# 4. 보안 인증 화면 (비밀번호: 0101, 엔터 키 지원)
+if not st.authenticated:
+  # 변수명 호환성 체크
+  pass
+
 if not st.session_state.authenticated:
   st.title("🔒 SAE-A QA SOP 보안 인증")
   st.write("매뉴얼을 열람하려면 시스템 비밀번호(숫자 4자리)를 입력하십시오.")
@@ -41,28 +45,49 @@ if not st.session_state.authenticated:
 
 # --- 인증 완료 후 메인 로직 ---
 
-# 5. 메인 SOP 핸드북 파일 고정 지정 (다른 파일이 섞이지 않도록 명확히 타겟팅)
+# 5. 폴더 내 PDF 파일들을 스캔하여 정확한 파일명을 자동 매칭
+all_files = os.listdir(".")
+pdf_files = [f for f in all_files if f.lower().endswith(".pdf")]
+
+# 국문/영문 파일 자동 찾기
+target_pdf = None
 if lang == "한국어 (Korean)":
-  pdf_filename = "SOP_Handbook_국문본_VER_1.2 2025.09.pdf"
+  # 국문 파일 후보 검색
+  for f in pdf_files:
+    if "국문" in f or "kor" in f.lower() or "korean" in f.lower():
+      target_pdf = f
+      break
+  # 못 찾았으면 첫 번째 PDF 선택
+  if not target_pdf and pdf_files:
+    target_pdf = pdf_files[0]
+else:
+  # 영문 파일 후보 검색
+  for f in pdf_files:
+    if "eng" in f.lower() or "english" in f.lower():
+      target_pdf = f
+      break
+  # 못 찾았으면 두 번째 PDF 또는 첫 번째 선택
+  if not target_pdf and len(pdf_files) > 1:
+    target_pdf = pdf_files[1]
+  elif not target_pdf and pdf_files:
+    target_pdf = pdf_files[0]
+
+# PDF 로드
+reader = None
+if target_pdf and os.path.exists(target_pdf):
+  try:
+    reader = pypdf.PdfReader(target_pdf)
+  except Exception as e:
+    reader = None
+
+if lang == "한국어 (Korean)":
   st.sidebar.markdown("---")
   st.sidebar.subheader("SOP 목차")
 else:
-  pdf_filename = "SOP_Handbook_ENGLISH_VER_1.2 2025.09.pdf"
   st.sidebar.markdown("---")
   st.sidebar.subheader("SOP Table of Contents")
 
-
-# PDF 로드 함수
-@st.cache_resource
-def load_main_pdf(filename):
-  if os.path.exists(filename):
-    return pypdf.PdfReader(filename)
-  return None
-
-
-reader = load_main_pdf(pdf_filename)
-
-# 6. 국문/영문 목차 및 정확한 실제 페이지 매칭 정의
+# 6. 목차 데이터 정의
 toc_data_kr = [
     ("1. 개요 (Overview)", 3),
     ("2. QA/QC 정의", 4),
@@ -161,16 +186,15 @@ toc_data_en = [
 
 toc_data = toc_data_kr if lang == "한국어 (Korean)" else toc_data_en
 toc_titles = [item[0] for item in toc_data]
-
-# 7. 목차 선택 및 페이지 찾기
 selected_title = st.sidebar.radio("목차를 선택하세요:", toc_titles)
+
 selected_page_num = 3
 for title, p_num in toc_data:
   if title == selected_title:
     selected_page_num = p_num
     break
 
-# 8. 메인 화면 구성 (보안 경고 문구 + 매뉴얼 텍스트)
+# 7. 메인 화면 렌더링
 if lang == "한국어 (Korean)":
   st.markdown(
       """
@@ -188,7 +212,6 @@ else:
   )
   st.subheader(f"📖 {selected_title}")
 
-# 9. PDF 텍스트 렌더링
 if reader:
   target_idx = max(0, selected_page_num - 1)
   if target_idx < len(reader.pages):
@@ -199,11 +222,11 @@ if reader:
         height=600,
         disabled=True,
     )
-    st.info(
-        f"현재 표시된 페이지: PDF {selected_page_num}페이지 | 연동된 메인 핸드북:"
-        f" {pdf_filename}"
-    )
+    st.info(f"현재 페이지: PDF {selected_page_num}페이지 | 연동 파일: {target_pdf}")
   else:
     st.error("해당 페이지를 찾을 수 없습니다.")
 else:
-  st.error(f"메인 SOP PDF 파일을 찾을 수 없습니다: {pdf_filename}")
+  st.error(
+      f"PDF 파일을 찾지 못했습니다. 현재 폴더에 있는 PDF 파일 목록: {pdf_files}"
+      " (※ GitHub에 PDF 파일들이 함께 업로드되었는지 확인해주세요.)"
+  )
