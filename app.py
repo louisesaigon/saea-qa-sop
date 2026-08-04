@@ -13,6 +13,36 @@ st.set_page_config(
 
 assets_dir = os.path.join(os.path.dirname(__file__), "assets")
 
+# 1. 고정 목차 데이터셋 (한국어 및 영어 매핑)
+SOP_TOC = [
+    {"num": 1, "ko": "머리말", "en": "Introduction", "page": 1},
+    {"num": 2, "ko": "QA/QC 정의", "en": "QA/QC Definition", "page": 1},
+    {"num": 3, "ko": "AQL (Acceptable Quality Limit)", "en": "AQL (Acceptable Quality Limit)", "page": 2},
+    {"num": 4, "ko": "Sae-A DCL (Defect Classification List)", "en": "Sae-A DCL (Defect Classification List)", "page": 4},
+    {"num": 5, "ko": "원단 검사/4point System", "en": "Fabric Inspection/4point System", "page": 6},
+    {"num": 6, "ko": "원단 방단", "en": "Fabric Relaxtion Management", "page": 7},
+    {"num": 7, "ko": "부자재 검사", "en": "Trims & Accessories Inspection", "page": 10},
+    {"num": 8, "ko": "패턴 조정 절차 및 관리", "en": "Pattern Adjustment & Management", "page": 13},
+    {"num": 9, "ko": "PPM Workflow Chart", "en": "PPM Workflow Chart", "page": 16},
+    {"num": 10, "ko": "PP Sample 제작", "en": "PP Sample Making", "page": 18},
+    {"num": 11, "ko": "Internal PPM", "en": "Internal PPM", "page": 19},
+    {"num": 12, "ko": "PPM", "en": "PPM Process", "page": 21},
+    {"num": 13, "ko": "연단 및 마커 검사", "en": "Spreading & Marker Inspection", "page": 23},
+    {"num": 14, "ko": "재단물 검사", "en": "Cut Panel Inspection", "page": 25},
+    {"num": 15, "ko": "재완성 검사", "en": "Sub-Assembly Inspection", "page": 27},
+    {"num": 16, "ko": "봉제 라인 검사", "en": "Sewing In-line Inspection", "page": 29},
+    {"num": 17, "ko": "완사 검사", "en": "End-line Inspection", "page": 31},
+    {"num": 18, "ko": "완성 포장 검사", "en": "Finishing & Packing Inspection", "page": 33},
+    {"num": 19, "ko": "Shipment Inspection", "en": "Shipment Inspection", "page": 35},
+    {"num": 20, "ko": "검사장비 및 측정도구 관리", "en": "Inspection Tools & Equipment", "page": 37},
+    {"num": 21, "ko": "봉제기계/설비 표준 운영", "en": "Sewing Machine Operation Standard", "page": 39},
+    {"num": 22, "ko": "바늘 관리 수칙", "en": "Needle Control Procedure", "page": 41},
+    {"num": 23, "ko": "칼/이물질 관리 수칙", "en": "Sharps & Foreign Matter Control", "page": 43},
+    {"num": 24, "ko": "금속검출기 운영", "en": "Needle Detector Operation", "page": 45},
+    {"num": 25, "ko": "습도 및 곰팡이 관리", "en": "Humidity & Mold Control", "page": 47},
+    {"num": 26, "ko": "교육 및 훈련", "en": "Training & Qualification", "page": 49}
+]
+
 UI_LABELS = {
     "KO": {
         "title": "📋 SAE-A QA SOP",
@@ -23,7 +53,7 @@ UI_LABELS = {
         "total_pages": "전체",
         "no_file": "⚠️ SOP 매뉴얼 PDF 파일을 찾을 수 없습니다.",
         "no_text": "해당 페이지에 표시할 텍스트가 없습니다.",
-        "translating": "🔄 베트남어로 자동 번역 중입니다..."
+        "translating": "🔄 베트남어로 번역 중입니다..."
     },
     "EN": {
         "title": "📋 SAE-A QA SOP",
@@ -50,15 +80,12 @@ UI_LABELS = {
 }
 
 def find_sop_pdf(lang_code):
-    """assets 폴더에서 한국어/영어 PDF 탐색 (베트남어 선택 시 기본 원문 사용)"""
     if not os.path.exists(assets_dir):
         return None
     files = os.listdir(assets_dir)
-    # 먼저 해당 언어 파일 검색
     for file in files:
         if file.lower().endswith(".pdf") and lang_code.lower() in file.lower():
             return file
-    # 베트남어 파일이 없을 경우 기본적으로 EN 또는 KO 파일 사용
     pdf_files = [f for f in files if f.lower().endswith(".pdf")]
     return pdf_files[0] if pdf_files else None
 
@@ -72,7 +99,10 @@ def load_pdf_data(pdf_filename):
         pages_text = []
         for page in reader.pages:
             text = page.extract_text() or ""
-            cleaned = re.sub(r'\.{3,}', ' ', text)
+            # 연속 점선 및 지저분한 특수문자 완벽 제거
+            cleaned = re.sub(r'\.{2,}', '', text)
+            cleaned = re.sub(r'·{2,}', '', cleaned)
+            cleaned = re.sub(r'_{2,}', '', cleaned)
             pages_text.append(cleaned)
         return pages_text
     except Exception:
@@ -80,38 +110,17 @@ def load_pdf_data(pdf_filename):
 
 @st.cache_data
 def translate_to_vietnamese(text):
-    """실시간 베트남어 자동 번역 (캐싱 처리로 속도 최적화)"""
     if not text.strip():
         return ""
     try:
-        # 긴 문단 분할 번역 처리
         translator = GoogleTranslator(source='auto', target='vi')
-        # deep-translator 5000자 제한 방지용 슬라이싱
         chunks = [text[i:i+3000] for i in range(0, len(text), 3000)]
         translated_chunks = [translator.translate(chunk) for chunk in chunks]
         return "\n".join(translated_chunks)
-    except Exception as e:
-        return text + f"\n\n(⚠️ 번역 중 오류가 발생했습니다: {e})"
+    except Exception:
+        return text
 
-def parse_contents_from_pages(pages_data):
-    toc_dict = {}
-    if len(pages_data) < 2:
-        return toc_dict
-    contents_text = pages_data[0] + "\n" + pages_data[1]
-    lines = contents_text.split('\n')
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        match = re.search(r'^(.*?)\s*(\d+)$', line)
-        if match:
-            title = match.group(1).strip()
-            page_num = int(match.group(2))
-            if len(title) > 2 and page_num <= len(pages_data):
-                toc_dict[f"📌 {title}"] = page_num
-    return toc_dict
-
-# --- 1. 사이드바 ---
+# --- 1. 사이드바 (왼쪽 메뉴) ---
 with st.sidebar:
     lang_choice = st.radio("🌐 언어 선택 / Language", ["한국어", "English", "Tiếng Việt"])
     lang_map = {"한국어": "KO", "English": "EN", "Tiếng Việt": "VI"}
@@ -123,18 +132,27 @@ with st.sidebar:
     
     target_pdf = find_sop_pdf(lang_code)
     pages_data = load_pdf_data(target_pdf) if target_pdf else []
-    toc_menu = parse_contents_from_pages(pages_data) if pages_data else {}
     
     st.subheader(labels["toc_header"])
     
-    if toc_menu:
-        selected_title = st.radio(labels["select_item"], list(toc_menu.keys()))
-        target_page_num = toc_menu[selected_title]
-    else:
-        page_list = [f"Page {i+1}" for i in range(len(pages_data))]
-        selected_page_str = st.selectbox("Page:", page_list) if page_list else "Page 1"
-        target_page_num = int(selected_page_str.replace("Page ", "")) if page_list else 1
-        selected_title = f"Page {target_page_num}"
+    # 선택된 언어에 맞춰 목차 항목 생성
+    toc_options = []
+    for item in SOP_TOC:
+        if lang_code == "KO":
+            label = f"📌 {item['num']}. {item['ko']}"
+        elif lang_code == "EN":
+            label = f"📌 {item['num']}. {item['en']}"
+        else: # 베트남어
+            # 기본 영어 항목 사용 후 화면 출력 시 베트남어 번역
+            label = f"📌 {item['num']}. {item['en']}"
+        toc_options.append(label)
+    
+    selected_label = st.radio(labels["select_item"], toc_options)
+    
+    # 선택된 라디오 메뉴의 인덱스에서 페이지 번호 추출
+    selected_index = toc_options.index(selected_label)
+    selected_item_info = SOP_TOC[selected_index]
+    target_page_num = selected_item_info["page"]
 
 # --- 2. 메인 화면 ---
 st.header(f"{labels['manual_header']} ({lang_choice})")
@@ -143,16 +161,22 @@ if target_pdf and pages_data:
     page_idx = max(0, min(target_page_num - 1, len(pages_data) - 1))
     page_content = pages_data[page_idx]
     
-    # 베트남어 선택 시 실시간 번역 적용
+    # 제목 결정
+    if lang_code == "KO":
+        item_title = f"{selected_item_info['num']}. {selected_item_info['ko']}"
+    else:
+        item_title = f"{selected_item_info['num']}. {selected_item_info['en']}"
+    
+    # 베트남어 모드 시 실시간 번역
     if lang_code == "VI":
         with st.spinner(labels["translating"]):
-            display_title = translate_to_vietnamese(selected_title)
+            display_title = translate_to_vietnamese(item_title)
             display_content = translate_to_vietnamese(page_content)
     else:
-        display_title = selected_title
+        display_title = item_title
         display_content = page_content
 
-    st.subheader(display_title)
+    st.subheader(f"📄 {display_title}")
     
     with st.container(border=True):
         if display_content.strip():
