@@ -19,61 +19,38 @@ lang = st.sidebar.radio(
     "Language / 언어 선택", ["한국어 (Korean)", "English"], index=0
 )
 
-# 비밀번호 인증 화면
+# 비밀번호 인증 화면 (form을 사용하여 엔터 키 입력 시 자동 인증 처리)
 if not st.session_state.authenticated:
   st.title("🔒 SAE-A QA SOP 보안 인증")
   st.write("매뉴얼을 열람하려면 시스템 비밀번호(숫자 4자리)를 입력하십시오.")
 
-  password = st.text_input(
-      "비밀번호 입력", type="password", max_chars=4, placeholder="0101"
-  )
-  if st.button("인증 확인"):
-    if password == "0101":
-      st.session_state.authenticated = True
-      st.rerun()
-    else:
-      st.error("비밀번호가 틀렸습니다. (힌트: 0101)")
+  with st.form("auth_form"):
+    password = st.text_input(
+        "비밀번호 입력",
+        type="password",
+        max_chars=4,
+        value="",
+        placeholder="비밀번호 4자리 입력",
+    )
+    submitted = st.form_submit_button("인증 확인")
+
+    if submitted:
+      if password == "0101":
+        st.session_state.authenticated = True
+        st.rerun()
+      else:
+        st.error("비밀번호가 틀렸습니다. (힌트: 0101)")
   st.stop()
 
 # --- 인증 완료 후 메인 앱 로직 ---
 
-# 현재 디렉토리의 파일들을 스캔하여 올바른 PDF 파일을 자동으로 찾기
-files = os.listdir(".")
-
-
-def find_pdf(lang_type):
-  for f in files:
-    if f.lower().endswith(".pdf"):
-      if lang_type == "kr" and (
-          "국문" in f or "kr" in f.lower() or "korean" in f.lower()
-      ):
-        return f
-      if lang_type == "en" and (
-          "english" in f.lower()
-          or "en" in f.lower()
-          or "eng" in f.lower()
-          or "global" in f.lower()
-      ):
-        return f
-  # 차선책: 이름으로 못 찾으면 대략적인 매칭
-  pdf_files = [f for f in files if f.lower().endswith(".pdf")]
-  if len(pdf_files) >= 2:
-    return pdf_files[0] if lang_type == "kr" else pdf_files[1]
-  elif len(pdf_files) == 1:
-    return pdf_files[0]
-  return None
-
-
+# 사용자님이 변경하신 실제 파일명 명시적 매핑
 if lang == "한국어 (Korean)":
-  pdf_path = find_pdf("kr")
-  if not pdf_path:
-    pdf_path = "SOP_Handbook_국문본_VER_1.2 2025.09.pdf"  # 기본값 fallback
+  pdf_path = "SOP_Handbook_KOR_20250901.pdf"
   st.sidebar.markdown("---")
   st.sidebar.subheader("SOP 목차")
 else:
-  pdf_path = find_pdf("en")
-  if not pdf_path:
-    pdf_path = "SOP_Handbook_ENGLISH_VER_1.2 2025.09.pdf"  # 기본값 fallback
+  pdf_path = "SOP_Handbook_ENG_20250901.pdf"
   st.sidebar.markdown("---")
   st.sidebar.subheader("SOP Table of Contents")
 
@@ -235,6 +212,6 @@ if reader:
     st.error("해당 페이지를 찾을 수 없습니다.")
 else:
   st.error(
-      f"PDF 파일을 찾을 수 없습니다. 폴더 내 파일명과 일치하는지 확인해주세요."
-      f" (인식된 경로: {pdf_path})"
+      f"PDF 파일을 찾을 수 없습니다. 파일명을 확인해주세요. (현재 지정된 파일:"
+      f" {pdf_path})"
   )
