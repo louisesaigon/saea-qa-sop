@@ -3,16 +3,16 @@ import os
 import pypdf
 import streamlit as st
 
-# 1. 페이지 기본 설정
+# 1. 페이지 설정
 st.set_page_config(
     page_title="SOP Smart Handbook - SAE-A", page_icon="🔒", layout="wide"
 )
 
-# 2. 세션 상태 초기화
+# 2. 세션 상태 초기화 (비밀번호 인증)
 if "authenticated" not in st.session_state:
   st.session_state.authenticated = False
 
-# 3. 사이드바 - 시스템 및 언어 설정
+# 3. 사이드바 설정
 st.sidebar.title("SAE-A QA SOP System")
 lang = st.sidebar.radio(
     "Language / 언어 선택", ["한국어 (Korean)", "English"], index=0
@@ -42,14 +42,13 @@ if not st.session_state.authenticated:
 
 # --- 인증 완료 후 메인 로직 ---
 
-# 5. 폴더 내 모든 PDF 파일을 자동 탐색하여 절대 에러가 나지 않도록 처리하는 함수
+# 5. 폴더 내 PDF 파일 자동 감지 로직 (파일명 무관하게 인식)
 @st.cache_resource
-def get_pdf():
-  pdf_files = sorted(glob.glob("*.pdf"))
+def get_pdf_reader(selected_lang):
+  pdf_files = glob.glob("*.pdf")
   if not pdf_files:
-    return None, "PDF 파일 없음"
+    return None, "현재 폴더에 PDF 파일이 없습니다. (GitHub에 PDF 업로드 필요)"
 
-  # 국문/영문 구분
   kr_file, en_file = None, None
   for f in pdf_files:
     f_lower = f.lower()
@@ -60,10 +59,12 @@ def get_pdf():
         or "국문본" in f
     ):
       kr_file = f
-    elif "eng" in f_lower or "english" in f_lower:
-      en_file = f
+    elif "eng" in f_lower or "english" in f_lower or "ver" in f_lower:
+      # 영문 파일 매칭
+      if not en_file:
+        en_file = f
 
-  # 키워드 매칭이 안 될 경우 순서대로 배정
+  # 만약 키워드로 못 찾았을 경우 순서대로 배정
   if not kr_file and len(pdf_files) > 0:
     kr_file = pdf_files[0]
   if not en_file and len(pdf_files) > 1:
@@ -71,14 +72,18 @@ def get_pdf():
   elif not en_file:
     en_file = pdf_files[0]
 
-  chosen_file = kr_file if lang == "한국어 (Korean)" else en_file
+  target = kr_file if selected_lang == "kr" else en_file
+  if not target:
+    return None, f"매칭되는 PDF 없음 (파일 목록: {pdf_files})"
+
   try:
-    return pypdf.PdfReader(chosen_file), chosen_file
+    return pypdf.PdfReader(target), target
   except Exception as e:
     return None, str(e)
 
 
-reader, file_name = get_pdf()
+lang_key = "kr" if lang == "한국어 (Korean)" else "en"
+reader, file_info = get_pdf_reader(lang_key)
 
 if lang == "한국어 (Korean)":
   st.sidebar.markdown("---")
@@ -186,7 +191,7 @@ toc_data_en = [
 
 toc_data = toc_data_kr if lang == "한국어 (Korean)" else toc_data_en
 
-# 7. 목차 선택 및 페이지 매칭
+# 7. 목차 선택
 toc_titles = [item[0] for item in toc_data]
 selected_title = st.sidebar.radio("목차를 선택하세요:", toc_titles)
 
@@ -196,7 +201,7 @@ for title, p_num in toc_data:
     selected_page_num = p_num
     break
 
-# 8. 메인 화면 구성 (보안 경고 및 매뉴얼 텍스트 렌더링)
+# 8. 메인 화면 렌더링
 if lang == "한국어 (Korean)":
   st.markdown(
       """
@@ -226,9 +231,12 @@ if reader and isinstance(reader, pypdf.PdfReader):
     )
     st.info(
         f"현재 표시된 페이지: PDF {selected_page_num}페이지 | 연동 파일:"
-        f" {file_name}"
+        f" {file_info}"
     )
   else:
     st.error("해당 페이지를 찾을 수 없습니다.")
 else:
-  st.error(f"PDF 파일을 불러오지 못했습니다. 파일 상태: {file_name}")
+  st.error(
+      f"PDF 파일을 불러오지 못했습니다. 원인: {file_info} (※ 참고: GitHub"
+      " 저장소에 PDF 파일들이 정상적으로 push 되어 있는지 확인해주세요.)"
+  )
