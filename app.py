@@ -1,25 +1,24 @@
+import glob
 import os
 import pypdf
 import streamlit as st
 
-# 1. 페이지 설정
+# 1. 페이지 기본 설정
 st.set_page_config(
     page_title="SOP Smart Handbook - SAE-A", page_icon="🔒", layout="wide"
 )
 
-# 2. 세션 상태 초기화 (비밀번호 인증용)
+# 2. 세션 상태 초기화
 if "authenticated" not in st.session_state:
   st.session_state.authenticated = False
 
-# 3. 사이드바 - 언어 및 메뉴 설정
+# 3. 사이드바 - 시스템 및 언어 설정
 st.sidebar.title("SAE-A QA SOP System")
-
-# 언어 선택 (한국어, 영어만 제공)
 lang = st.sidebar.radio(
     "Language / 언어 선택", ["한국어 (Korean)", "English"], index=0
 )
 
-# 비밀번호 인증 화면 (엔터 키 입력 시 바로 인증 확인 가능)
+# 4. 보안 인증 화면 (비밀번호: 0101, 엔터 키 지원)
 if not st.session_state.authenticated:
   st.title("🔒 SAE-A QA SOP 보안 인증")
   st.write("매뉴얼을 열람하려면 시스템 비밀번호(숫자 4자리)를 입력하십시오.")
@@ -33,7 +32,6 @@ if not st.session_state.authenticated:
         placeholder="비밀번호 4자리 입력",
     )
     submitted = st.form_submit_button("인증 확인")
-
     if submitted:
       if password == "0101":
         st.session_state.authenticated = True
@@ -42,43 +40,54 @@ if not st.session_state.authenticated:
         st.error("비밀번호가 틀렸습니다. (힌트: 0101)")
   st.stop()
 
-# --- 인증 완료 후 메인 앱 로직 ---
+# --- 인증 완료 후 메인 로직 ---
 
-# GitHub에 업로드되어 있는 실제 파일명과 정확히 매칭
+# 5. 폴더 내 모든 PDF 파일을 자동 탐색하여 절대 에러가 나지 않도록 처리하는 함수
+@st.cache_resource
+def get_pdf():
+  pdf_files = sorted(glob.glob("*.pdf"))
+  if not pdf_files:
+    return None, "PDF 파일 없음"
+
+  # 국문/영문 구분
+  kr_file, en_file = None, None
+  for f in pdf_files:
+    f_lower = f.lower()
+    if (
+        "국문" in f
+        or "kor" in f_lower
+        or "korean" in f_lower
+        or "국문본" in f
+    ):
+      kr_file = f
+    elif "eng" in f_lower or "english" in f_lower:
+      en_file = f
+
+  # 키워드 매칭이 안 될 경우 순서대로 배정
+  if not kr_file and len(pdf_files) > 0:
+    kr_file = pdf_files[0]
+  if not en_file and len(pdf_files) > 1:
+    en_file = pdf_files[1]
+  elif not en_file:
+    en_file = pdf_files[0]
+
+  chosen_file = kr_file if lang == "한국어 (Korean)" else en_file
+  try:
+    return pypdf.PdfReader(chosen_file), chosen_file
+  except Exception as e:
+    return None, str(e)
+
+
+reader, file_name = get_pdf()
+
 if lang == "한국어 (Korean)":
-  pdf_path = "SOP_Handbook_국문본_VER_1.2 2025.09.pdf"
   st.sidebar.markdown("---")
   st.sidebar.subheader("SOP 목차")
 else:
-  pdf_path = "SOP_Handbook_ENGLISH_VER_1.2 2025.09.pdf"
   st.sidebar.markdown("---")
   st.sidebar.subheader("SOP Table of Contents")
 
-
-# PDF 로드 함수 (혹시 모를 상황을 대비해 폴더 내 PDF 자동 검색 기능 포함)
-@st.cache_resource
-def load_pdf(target_path):
-  if os.path.exists(target_path):
-    return pypdf.PdfReader(target_path)
-
-  # 지정된 이름의 파일이 없다면 폴더 내 PDF 파일들을 자동 스캔하여 대체
-  pdf_files = [f for f in os.listdir(".") if f.lower().endswith(".pdf")]
-  if pdf_files:
-    # 국문은 첫 번째, 영문은 두 번째 파일 우선 배정
-    fallback = (
-        pdf_files[0]
-        if "국문" in target_path or "kr" in target_path.lower()
-        else pdf_files[-1]
-    )
-    if os.path.exists(fallback):
-      return pypdf.PdfReader(fallback)
-    return pypdf.PdfReader(pdf_files[0])
-  return None
-
-
-reader = load_pdf(pdf_path)
-
-# 국문/영문 목차 및 실제 PDF 페이지 매칭 정의
+# 6. 목차 및 페이지 매칭 데이터 정의
 toc_data_kr = [
     ("1. 개요 (Overview)", 3),
     ("2. QA/QC 정의", 4),
@@ -177,18 +186,17 @@ toc_data_en = [
 
 toc_data = toc_data_kr if lang == "한국어 (Korean)" else toc_data_en
 
-# 사이드바 라디오 버튼으로 목차 선택
+# 7. 목차 선택 및 페이지 매칭
 toc_titles = [item[0] for item in toc_data]
 selected_title = st.sidebar.radio("목차를 선택하세요:", toc_titles)
 
-# 선택된 항목의 실제 PDF 페이지 번호 매핑 찾기
 selected_page_num = 3
 for title, p_num in toc_data:
   if title == selected_title:
     selected_page_num = p_num
     break
 
-# 메인 화면 구성
+# 8. 메인 화면 구성 (보안 경고 및 매뉴얼 텍스트 렌더링)
 if lang == "한국어 (Korean)":
   st.markdown(
       """
@@ -206,8 +214,7 @@ else:
   )
   st.subheader(f"📖 {selected_title}")
 
-# PDF 페이지 텍스트 추출 및 표시
-if reader:
+if reader and isinstance(reader, pypdf.PdfReader):
   target_idx = max(0, selected_page_num - 1)
   if target_idx < len(reader.pages):
     page_text = reader.pages[target_idx].extract_text()
@@ -218,12 +225,10 @@ if reader:
         disabled=True,
     )
     st.info(
-        f"현재 표시된 페이지: PDF {selected_page_num}페이지 (SOP 문서 기준) |"
-        f" 파일명: {pdf_path}"
+        f"현재 표시된 페이지: PDF {selected_page_num}페이지 | 연동 파일:"
+        f" {file_name}"
     )
   else:
     st.error("해당 페이지를 찾을 수 없습니다.")
 else:
-  st.error(
-      f"PDF 파일을 찾을 수 없습니다. 경로와 파일명을 확인해주세요: {pdf_path}"
-  )
+  st.error(f"PDF 파일을 불러오지 못했습니다. 파일 상태: {file_name}")
