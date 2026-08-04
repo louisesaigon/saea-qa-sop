@@ -1,7 +1,6 @@
 import streamlit as st
 import os
-import re
-from pypdf import PdfReader
+import fitz  # PyMuPDF
 from deep_translator import GoogleTranslator
 
 st.set_page_config(
@@ -10,7 +9,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 사이드바 라디오 버튼 스타일 최적화 (텍스트 줄바꿈 및 간격)
+# 사이드바 및 모바일 가독성 최적화 CSS
 st.markdown("""
     <style>
     .stRadio > div {
@@ -27,100 +26,212 @@ st.markdown("""
 
 assets_dir = os.path.join(os.path.dirname(__file__), "assets")
 
-# 목차 목록 (옆에 P.1 등 페이지 번호 완전 제거)
-SOP_TOC = [
-    {"num": "1", "title": "1. 머리말", "keyword": "머리말"},
-    {"num": "2", "title": "2. QA/QC 정의", "keyword": "QA/QC 정의"},
-    {"num": "3", "title": "3. AQL (Acceptable Quality Limit)", "keyword": "AQL"},
-    {"num": "4", "title": "4. Sae-A DCL (Defect Classification List)", "keyword": "Defect Classification List"},
-    {"num": "5", "title": "5. 원단 검사/4point System", "keyword": "원단 검사"},
-    {"num": "6", "title": "6. 원단 방단", "keyword": "원단 방단"},
-    {"num": "7", "title": "7. 부자재 검사", "keyword": "부자재 검사"},
-    {"num": "8", "title": "8. 패턴 조정 절차 및 관리", "keyword": "패턴 조정"},
-    {"num": "9", "title": "9. PPM Workflow Chart", "keyword": "PPM Workflow"},
-    {"num": "10", "title": "10. PP Sample 제작", "keyword": "PP Sample"},
-    {"num": "11", "title": "11. Internal PPM", "keyword": "Internal PPM"},
-    {"num": "12", "title": "12. PPM", "keyword": "PPM"},
-    {"num": "13", "title": "13. 연단 및 마커 검사", "keyword": "연단 및 마커"},
-    {"num": "14", "title": "14. 재단물 검사", "keyword": "재단물 검사"},
-    {"num": "15", "title": "15. 자수/프린트 검사", "keyword": "자수"},
-    {"num": "16", "title": "16. Pilot Run 검사", "keyword": "Pilot Run"},
-    {"num": "17", "title": "17. Wear & Wash Test", "keyword": "Wear & Wash"},
-    {"num": "18", "title": "18. 1st Output 검사", "keyword": "1st Output"},
-    {"num": "19", "title": "19. In-Process 검사", "keyword": "In-Process"},
-    {"num": "20", "title": "20. Seam allowance 모니터링", "keyword": "Seam allowance"},
-    {"num": "21", "title": "21. In-line 검사", "keyword": "In-line 검사"},
-    {"num": "22", "title": "22. End-line 검사", "keyword": "End-line 검사"},
-    {"num": "23", "title": "23. Finishing 검사", "keyword": "Finishing 검사"},
-    {"num": "24", "title": "24. Dupro 검사", "keyword": "Dupro 검사"},
-    {"num": "25", "title": "25. Pre-Final 검사", "keyword": "Pre-Final"},
-    {"num": "26", "title": "26. Final 검사", "keyword": "Final 검사"},
-    {"num": "27", "title": "27. 바늘과 금속 오염 관리", "keyword": "바늘과 금속"},
-    {"num": "28", "title": "28. 검침기 사용 설명", "keyword": "검침기 사용"},
-    {"num": "29", "title": "29. 검침기 청소 관리", "keyword": "검침기 청소"},
-    {"num": "30", "title": "30. 9 point Calibration", "keyword": "9 point Calibration"},
-    {"num": "31", "title": "31. 핸드 검침기 사용법", "keyword": "핸드 검침기"},
-    {"num": "32", "title": "32. 9 point Calibration", "keyword": "Calibration"},
-    {"num": "33", "title": "33. 부적격 자재 관리 CNCM(Control of Non-conforming Material)", "keyword": "부적격 자재"},
-    {"num": "34", "title": "34. CAPA(Corrective & Preventive Action Plan)", "keyword": "CAPA"},
-    {"num": "35", "title": "35. 열전사 라벨/심지 부착관리", "keyword": "열전사 라벨"},
-    {"num": "36", "title": "36. Snap/Button 관리", "keyword": "Snap/Button"},
-    {"num": "37", "title": "37. Attachment Strength Test 방법 (Pulling Test)", "keyword": "Attachment Strength"},
-    {"num": "38", "title": "38. 어린이 제품 안전", "keyword": "어린이 제품"},
-    {"num": "39", "title": "39. Carton/Garment 습도 관리", "keyword": "습도 관리"},
-    {"num": "40", "title": "40. 곰팡이 발생 방지를 위한 현장 관리", "keyword": "곰팡이"},
-    {"num": "41", "title": "41. Aqua Boy 수분 측정기 사용법", "keyword": "Aqua Boy"},
-    {"num": "42", "title": "42. 잔사 불량 예방 및 관리", "keyword": "잔사 불량"},
-    {"num": "43", "title": "43. Virtual Inspection", "keyword": "Virtual Inspection"},
-    {"num": "44", "title": "44. Virtual FE", "keyword": "Virtual FE"},
-    {"num": "45", "title": "45. Risk Assessment Process Meeting", "keyword": "Risk Assessment"},
-    {"num": "App1", "title": "부록1 Inspection Procedure (Production Test Plan)", "keyword": "Inspection Procedure"},
-    {"num": "App2", "title": "부록2 FE Quick check list", "keyword": "Quick check list"},
-    {"num": "App3", "title": "부록3 Sewing Factory Self Assessment Report", "keyword": "Self Assessment"},
-    {"num": "App4", "title": "부록4 Mold Prevention Checklist", "keyword": "Mold Prevention"},
-    {"num": "App5", "title": "부록5 Wear & Wash Test Report", "keyword": "Test Report"}
-]
+# 다국어 목차 데이터셋 (한국어 / 영어 / 베트남어)
+TOC_DATA = {
+    "KO": [
+        {"title": "1. 머리말", "page": 3},
+        {"title": "2. QA/QC 정의", "page": 4},
+        {"title": "3. AQL (Acceptable Quality Limit)", "page": 5},
+        {"title": "4. Sae-A DCL (Defect Classification List)", "page": 7},
+        {"title": "5. 원단 검사/4point System", "page": 9},
+        {"title": "6. 원단 방단", "page": 10},
+        {"title": "7. 부자재 검사", "page": 13},
+        {"title": "8. 패턴 조정 절차 및 관리", "page": 16},
+        {"title": "9. PPM Workflow Chart", "page": 19},
+        {"title": "10. PP Sample 제작", "page": 21},
+        {"title": "11. Internal PPM", "page": 22},
+        {"title": "12. PPM", "page": 24},
+        {"title": "13. 연단 및 마커 검사", "page": 26},
+        {"title": "14. 재단물 검사", "page": 28},
+        {"title": "15. 자수/프린트 검사", "page": 30},
+        {"title": "16. Pilot Run 검사", "page": 32},
+        {"title": "17. Wear & Wash Test", "page": 34},
+        {"title": "18. 1st Output 검사", "page": 36},
+        {"title": "19. In-Process 검사", "page": 38},
+        {"title": "20. Seam allowance 모니터링", "page": 40},
+        {"title": "21. In-line 검사", "page": 42},
+        {"title": "22. End-line 검사", "page": 44},
+        {"title": "23. Finishing 검사", "page": 46},
+        {"title": "24. Dupro 검사", "page": 48},
+        {"title": "25. Pre-Final 검사", "page": 50},
+        {"title": "26. Final 검사", "page": 52},
+        {"title": "27. 바늘과 금속 오염 관리", "page": 54},
+        {"title": "28. 검침기 사용 설명", "page": 56},
+        {"title": "29. 검침기 청소 관리", "page": 58},
+        {"title": "30. 9 point Calibration", "page": 60},
+        {"title": "31. 핸드 검침기 사용법", "page": 62},
+        {"title": "32. 9 point Calibration", "page": 64},
+        {"title": "33. 부적격 자재 관리 CNCM", "page": 66},
+        {"title": "34. CAPA", "page": 68},
+        {"title": "35. 열전사 라벨/심지 부착관리", "page": 70},
+        {"title": "36. Snap/Button 관리", "page": 72},
+        {"title": "37. Attachment Strength Test 방법", "page": 74},
+        {"title": "38. 어린이 제품 안전", "page": 76},
+        {"title": "39. Carton/Garment 습도 관리", "page": 78},
+        {"title": "40. 곰팡이 발생 방지 현장 관리", "page": 80},
+        {"title": "41. Aqua Boy 수분 측정기 사용법", "page": 82},
+        {"title": "42. 잔사 불량 예방 및 관리", "page": 84},
+        {"title": "43. Virtual Inspection", "page": 86},
+        {"title": "44. Virtual FE", "page": 88},
+        {"title": "45. Risk Assessment Process Meeting", "page": 90},
+        {"title": "부록 1. Inspection Procedure", "page": 93},
+        {"title": "부록 2. FE Quick check list", "page": 98},
+        {"title": "부록 3. Sewing Factory Self Assessment", "page": 103},
+        {"title": "부록 4. Mold Prevention Checklist", "page": 108},
+        {"title": "부록 5. Wear & Wash Test Report", "page": 113}
+    ],
+    "EN": [
+        {"title": "1. Introduction", "page": 3},
+        {"title": "2. QA/QC Definition", "page": 4},
+        {"title": "3. AQL (Acceptable Quality Limit)", "page": 5},
+        {"title": "4. Sae-A DCL (Defect Classification List)", "page": 7},
+        {"title": "5. Fabric Inspection / 4point System", "page": 9},
+        {"title": "6. Fabric Relaxation Management", "page": 10},
+        {"title": "7. Trims & Accessories Inspection", "page": 13},
+        {"title": "8. Pattern Adjustment & Management", "page": 16},
+        {"title": "9. PPM Workflow Chart", "page": 19},
+        {"title": "10. PP Sample Making", "page": 21},
+        {"title": "11. Internal PPM", "page": 22},
+        {"title": "12. PPM Process", "page": 24},
+        {"title": "13. Spreading & Marker Inspection", "page": 26},
+        {"title": "14. Cut Panel Inspection", "page": 28},
+        {"title": "15. Embroidery/Print Inspection", "page": 30},
+        {"title": "16. Pilot Run Inspection", "page": 32},
+        {"title": "17. Wear & Wash Test", "page": 34},
+        {"title": "18. 1st Output Inspection", "page": 36},
+        {"title": "19. In-Process Inspection", "page": 38},
+        {"title": "20. Seam Allowance Monitoring", "page": 40},
+        {"title": "21. In-line Inspection", "page": 42},
+        {"title": "22. End-line Inspection", "page": 44},
+        {"title": "23. Finishing Inspection", "page": 46},
+        {"title": "24. Dupro Inspection", "page": 48},
+        {"title": "25. Pre-Final Inspection", "page": 50},
+        {"title": "26. Final Inspection", "page": 52},
+        {"title": "27. Needle & Metal Contamination Control", "page": 54},
+        {"title": "28. Needle Detector Operation", "page": 56},
+        {"title": "29. Needle Detector Cleaning & Maintenance", "page": 58},
+        {"title": "30. 9 point Calibration", "page": 60},
+        {"title": "31. Hand-held Metal Detector Usage", "page": 62},
+        {"title": "32. 9 point Calibration (Hand Detector)", "page": 64},
+        {"title": "33. Control of Non-conforming Material (CNCM)", "page": 66},
+        {"title": "34. CAPA", "page": 68},
+        {"title": "35. Heat Transfer Label / Interlining Control", "page": 70},
+        {"title": "36. Snap / Button Control", "page": 72},
+        {"title": "37. Attachment Strength Test (Pulling Test)", "page": 74},
+        {"title": "38. Children's Product Safety", "page": 76},
+        {"title": "39. Carton / Garment Humidity Control", "page": 78},
+        {"title": "40. Mold Prevention Site Management", "page": 80},
+        {"title": "41. Aqua Boy Moisture Meter Usage", "page": 82},
+        {"title": "42. Loose Fiber / Residue Prevention", "page": 84},
+        {"title": "43. Virtual Inspection", "page": 86},
+        {"title": "44. Virtual FE", "page": 88},
+        {"title": "45. Risk Assessment Process Meeting", "page": 90},
+        {"title": "Appendix 1. Inspection Procedure", "page": 93},
+        {"title": "Appendix 2. FE Quick check list", "page": 98},
+        {"title": "Appendix 3. Sewing Factory Self Assessment", "page": 103},
+        {"title": "Appendix 4. Mold Prevention Checklist", "page": 108},
+        {"title": "Appendix 5. Wear & Wash Test Report", "page": 113}
+    ],
+    "VI": [
+        {"title": "1. Giới thiệu (Introduction)", "page": 3},
+        {"title": "2. Định nghĩa QA/QC", "page": 4},
+        {"title": "3. AQL (Giới hạn chất lượng chấp nhận được)", "page": 5},
+        {"title": "4. Danh mục phân loại lỗi Sae-A (DCL)", "page": 7},
+        {"title": "5. Kiểm tra vải / Hệ thống 4 điểm", "page": 9},
+        {"title": "6. Quản lý thả lỏng vải", "page": 10},
+        {"title": "7. Kiểm tra nguyên phụ liệu", "page": 13},
+        {"title": "8. Quy trình điều chỉnh và quản lý rập", "page": 16},
+        {"title": "9. Biểu đồ quy trình PPM", "page": 19},
+        {"title": "10. Làm mẫu PP", "page": 21},
+        {"title": "11. PPM nội bộ", "page": 22},
+        {"title": "12. Quy trình PPM", "page": 24},
+        {"title": "13. Kiểm tra trải vải và sơ đồ", "page": 26},
+        {"title": "14. Kiểm tra bán thành phẩm cắt", "page": 28},
+        {"title": "15. Kiểm tra thêu/in", "page": 30},
+        {"title": "16. Kiểm tra chạy thử (Pilot Run)", "page": 32},
+        {"title": "17. Kiểm tra độ bền giặt (Wear & Wash)", "page": 34},
+        {"title": "18. Kiểm tra sản phẩm đầu ra đầu tiên", "page": 36},
+        {"title": "19. Kiểm tra trong quá trình sản xuất", "page": 38},
+        {"title": "20. Theo dõi độ rộng đường may", "page": 40},
+        {"title": "21. Kiểm tra chuyền (In-line)", "page": 42},
+        {"title": "22. Kiểm tra cuối chuyền (End-line)", "page": 44},
+        {"title": "23. Kiểm tra hoàn thiện (Finishing)", "page": 46},
+        {"title": "24. Kiểm tra Dupro", "page": 48},
+        {"title": "25. Kiểm tra tiền xuất hàng (Pre-Final)", "page": 50},
+        {"title": "26. Kiểm tra cuối cùng (Final)", "page": 52},
+        {"title": "27. Quản lý kim và nhiễm bẩn kim loại", "page": 54},
+        {"title": "28. Vận hành máy dò kim", "page": 56},
+        {"title": "29. Vệ sinh và bảo dưỡng máy dò kim", "page": 58},
+        {"title": "30. Hiệu chuẩn 9 điểm", "page": 60},
+        {"title": "31. Sử dụng máy dò kim cầm tay", "page": 62},
+        {"title": "32. Hiệu chuẩn 9 điểm (Máy cầm tay)", "page": 64},
+        {"title": "33. Quản lý nguyên vật liệu không phù hợp (CNCM)", "page": 66},
+        {"title": "34. Kế hoạch hành động khắc phục & phòng ngừa (CAPA)", "page": 68},
+        {"title": "35. Quản lý nhãn ép nhiệt / keo mận", "page": 70},
+        {"title": "36. Quản lý nút / Snap", "page": 72},
+        {"title": "37. Kiểm tra độ bền đính kết (Pulling Test)", "page": 74},
+        {"title": "38. An toàn sản phẩm trẻ em", "page": 76},
+        {"title": "39. Quản lý độ ẩm thùng carton / hàng hóa", "page": 78},
+        {"title": "40. Quản lý hiện trường phòng chống ẩm mốc", "page": 80},
+        {"title": "41. Sử dụng máy đo độ ẩm Aqua Boy", "page": 82},
+        {"title": "42. Phòng ngừa và quản lý lỗi xơ sợi thừa", "page": 84},
+        {"title": "43. Kiểm tra ảo (Virtual Inspection)", "page": 86},
+        {"title": "44. FE ảo (Virtual FE)", "page": 88},
+        {"title": "45. Họp quy trình đánh giá rủi ro", "page": 90},
+        {"title": "Phụ lục 1. Quy trình kiểm tra", "page": 93},
+        {"title": "Phụ lục 2. Danh sách kiểm tra nhanh FE", "page": 98},
+        {"title": "Phụ lục 3. Báo cáo tự đánh giá nhà máy may", "page": 103},
+        {"title": "Phụ lục 4. Bảng kiểm tra phòng ngừa ẩm mốc", "page": 108},
+        {"title": "Phụ lục 5. Báo cáo kiểm tra giặt", "page": 113}
+    ]
+}
 
 UI_LABELS = {
     "KO": {
         "title": "SAE-A QA SOP System",
-        "toc_header": "SOP 목차 목록 (전체 50개)",
+        "toc_header": "SOP 목차 (총 50개)",
         "manual_header": "SAE-A QA 표준 운영 절차 (SOP)",
-        "search_label": "SOP 키워드 검색",
-        "search_placeholder": "검색어를 입력하세요 (예: 핸드 검침기, 어린이, Calibration)",
         "page_info": "페이지 위치",
         "total_pages": "전체",
         "no_file": "SOP Handbook 메인 PDF 파일을 찾을 수 없습니다.",
-        "no_text": "해당 페이지에 표시할 텍스트 내용이 없습니다.",
-        "translating": "베트남어 자동 번역 진행 중..."
+        "auth_title": "🔒 SAE-A QA SOP 보안 인증",
+        "auth_desc": "매뉴얼을 열람하려면 시스템 비밀번호를 입력하십시오.",
+        "pw_label": "비밀번호 입력",
+        "pw_placeholder": "비밀번호를 입력하세요",
+        "pw_btn": "인증 확인",
+        "pw_error": "비밀번호가 올바르지 않습니다. 다시 입력해 주세요."
     },
     "EN": {
         "title": "SAE-A QA SOP System",
         "toc_header": "SOP Contents (50 Items)",
         "manual_header": "SAE-A QA Standard Operating Procedure (SOP)",
-        "search_label": "Search SOP Keywords",
-        "search_placeholder": "Enter search keyword (e.g. Needle, Calibration)",
         "page_info": "Reference Page",
         "total_pages": "Total",
         "no_file": "Cannot find main SOP Handbook PDF file.",
-        "no_text": "No text content available on this page.",
-        "translating": "Translating to Vietnamese..."
+        "auth_title": "🔒 SAE-A QA SOP Security Authentication",
+        "auth_desc": "Please enter the system password to access the manual.",
+        "pw_label": "Password",
+        "pw_placeholder": "Enter password",
+        "pw_btn": "Authenticate",
+        "pw_error": "Incorrect password. Please try again."
     },
     "VI": {
         "title": "Hệ thống SAE-A QA SOP",
         "toc_header": "Danh mục SOP (Tổng số 50 mục)",
         "manual_header": "Quy trình vận hành chuẩn SAE-A QA (SOP)",
-        "search_label": "Tìm kiếm từ khóa SOP",
-        "search_placeholder": "Nhập từ khóa (Ví dụ: Kiểm tra, Needle)",
         "page_info": "Trang tham khảo",
         "total_pages": "Tổng số",
         "no_file": "Không tìm thấy tệp PDF SOP chính.",
-        "no_text": "Không có nội dung văn bản trên trang này.",
-        "translating": "Đang tự động dịch sang tiếng Việt..."
+        "auth_title": "🔒 Xác thực bảo mật SAE-A QA SOP",
+        "auth_desc": "Vui lòng nhập mật khẩu hệ thống để xem sổ tay.",
+        "pw_label": "Mật khẩu",
+        "pw_placeholder": "Nhập mật khẩu",
+        "pw_btn": "Xác nhận",
+        "pw_error": "Mật khẩu không chính xác. Vui lòng thử lại."
     }
 }
 
-def find_main_sop_pdf(lang_code):
+def find_main_sop_pdf():
     if not os.path.exists(assets_dir):
         return None
     files = [f for f in os.listdir(assets_dir) if f.lower().endswith('.pdf')]
@@ -134,81 +245,26 @@ def find_main_sop_pdf(lang_code):
     return files_with_size[0][0]
 
 @st.cache_data
-def load_pdf_data(pdf_filename):
+def render_pdf_page_as_image(pdf_filename, page_num):
     pdf_path = os.path.join(assets_dir, pdf_filename)
     if not os.path.exists(pdf_path):
-        return []
+        return None
     try:
-        reader = PdfReader(pdf_path)
-        pages_text = [page.extract_text() or "" for page in reader.pages]
-        return pages_text
+        doc = fitz.open(pdf_path)
+        page_idx = max(0, min(page_num - 1, len(doc) - 1))
+        page = doc[page_idx]
+        pix = page.get_pixmap(dpi=150)
+        img_bytes = pix.tobytes("png")
+        doc.close()
+        return img_bytes
     except Exception:
-        return []
+        return None
 
-def find_matching_page_index(pages_data, item_info, default_idx):
-    """목차 페이지(Contents)를 건너뛰고 해당 섹션이 실제로 시작하는 본문 페이지 탐색"""
-    keyword = item_info.get("keyword", "").lower()
-    if not keyword or not pages_data:
-        return default_idx
+# --- 세션 상태 초기화 (비밀번호 인증용) ---
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
 
-    # 앞 3페이지(목차/표지 영역)를 제외하고 검색
-    start_search_page = 2 if len(pages_data) > 3 else 0
-
-    for idx in range(start_search_page, len(pages_data)):
-        page_text = pages_data[idx].lower()
-        if keyword in page_text:
-            return idx
-            
-    return default_idx
-
-def clean_and_format_text(raw_text):
-    """점선 제거 및 단락 구분을 통한 가독성 대폭 향상"""
-    if not raw_text.strip():
-        return ""
-    
-    # 1. 점선 및 특수 연속 기호 완전 제거
-    cleaned = re.sub(r'[\.·_]{2,}', '', raw_text)
-    
-    lines = cleaned.split('\n')
-    formatted_paragraphs = []
-    
-    for line in lines:
-        l = line.strip()
-        if not l:
-            continue
-            
-        # 2. 항목 번호, 주요 헤더 및 섹션 키워드 강하게 분리
-        is_header = any(l.startswith(kw) for kw in [
-            "Doc. No.", "Version", "Date", "Prepared", "Approved", 
-            "Department", "Note", "Objective", "Purpose", "Scope"
-        ]) or re.match(r'^\d+[\.\)]\s*', l) or re.match(r'^[가-하A-Z][\.\)]\s*', l)
-
-        if is_header:
-            formatted_paragraphs.append(f"\n\n### {l}\n")
-        else:
-            # 문장 마침표 뒤 단락 구분
-            l_formatted = re.sub(r'(\. )', '.\n\n', l)
-            formatted_paragraphs.append(l_formatted)
-            
-    result_text = " ".join(formatted_paragraphs)
-    # 불필요한 연속 개행 정리
-    result_text = re.sub(r'\n{3,}', '\n\n', result_text)
-    
-    return result_text.strip()
-
-@st.cache_data
-def translate_to_vietnamese(text):
-    if not text.strip():
-        return ""
-    try:
-        translator = GoogleTranslator(source='auto', target='vi')
-        chunks = [text[i:i+2500] for i in range(0, len(text), 2500)]
-        translated_chunks = [translator.translate(chunk) for chunk in chunks]
-        return "\n\n".join(translated_chunks)
-    except Exception:
-        return text
-
-# --- 1. 사이드바 ---
+# --- 1. 사이드바 (언어 선택) ---
 with st.sidebar:
     lang_choice = st.radio("언어 선택 / Language", ["한국어", "English", "Tiếng Việt"])
     lang_map = {"한국어": "KO", "English": "EN", "Tiếng Việt": "VI"}
@@ -218,61 +274,63 @@ with st.sidebar:
     st.markdown(f"### {labels['title']}")
     st.markdown("---")
     
-    target_pdf = find_main_sop_pdf(lang_code)
-    pages_data = load_pdf_data(target_pdf) if target_pdf else []
+    target_pdf = find_main_sop_pdf()
     
-    st.markdown(f"**{labels['toc_header']}**")
-    
-    # 페이지 번호(P.1 등) 없이 깔끔한 목차 제목만 노출
-    toc_titles = [item['title'] for item in SOP_TOC]
-    selected_title = st.radio("목차를 선택하세요:", toc_titles, index=0)
-    
-    selected_index = toc_titles.index(selected_title)
-    selected_item = SOP_TOC[selected_index]
-    
-    # 본문 해당 페이지 자동 탐색
-    estimated_idx = selected_index + 2
-    matched_page_idx = find_matching_page_index(pages_data, selected_item, estimated_idx)
+    # 인증 완료 후에만 사이드바에 목차 표시
+    if st.session_state.authenticated:
+        st.markdown(f"**{labels['toc_header']}**")
+        current_toc = TOC_DATA[lang_code]
+        toc_titles = [item['title'] for item in current_toc]
+        selected_title = st.radio("목차를 선택하세요:", toc_titles, index=0)
+        
+        selected_index = toc_titles.index(selected_title)
+        selected_item = current_toc[selected_index]
+        target_page_num = selected_item["page"]
+    else:
+        target_page_num = 3  # 기본 Introduction 페이지
 
 # --- 2. 메인 화면 ---
 st.caption(f"{labels['manual_header']} ({lang_choice})")
 
-search_query = st.text_input(labels["search_label"], placeholder=labels["search_placeholder"])
-
-if target_pdf and pages_data:
-    if search_query.strip():
-        st.markdown(f"#### 검색 결과: '{search_query}'")
-        found_count = 0
-        for i, p_text in enumerate(pages_data):
-            if search_query.lower() in p_text.lower():
-                found_count += 1
-                with st.expander(f"Page {i+1} 검색 결과"):
-                    st.markdown(clean_and_format_text(p_text))
-        if found_count == 0:
-            st.warning("일치하는 매뉴얼 내용을 찾을 수 없습니다.")
-    else:
-        page_idx = max(0, min(matched_page_idx, len(pages_data) - 1))
-        raw_content = pages_data[page_idx]
-        formatted_content = clean_and_format_text(raw_content)
-        
-        display_title = selected_item["title"]
-        
-        if lang_code == "VI":
-            with st.spinner(labels["translating"]):
-                display_title = translate_to_vietnamese(display_title)
-                display_content = translate_to_vietnamese(formatted_content)
-        else:
-            display_content = formatted_content
-
-        st.markdown(f"### 📖 {display_title}")
-        
-        with st.container(border=True):
-            if display_content.strip():
-                st.markdown(display_content)
-            else:
-                st.warning(labels["no_text"])
-                
-        st.caption(f"{labels['page_info']}: {page_idx + 1} / {labels['total_pages']} {len(pages_data)}")
-
-else:
+if not target_pdf:
     st.error(labels["no_file"])
+else:
+    doc_check = fitz.open(os.path.join(assets_dir, target_pdf))
+    total_pages = len(doc_check)
+    doc_check.close()
+
+    # --- 비밀번호 인증 화면 (미인증 시 첫 페이지는 Introduction을 보여주되 인증 창 표시) ---
+    if not st.session_state.authenticated:
+        st.markdown(f"### {labels['auth_title']}")
+        st.markdown(labels['auth_desc'])
+        
+        with st.form("auth_form"):
+            entered_pw = st.text_input(labels['pw_label'], type="password", placeholder=labels['pw_placeholder'])
+            submit_btn = st.form_submit_button(labels['pw_btn'])
+            
+            if submit_btn:
+                # 기본 비밀번호: saea2026 (원하시는 비밀번호로 변경 가능)
+                if entered_pw == "saea2026":
+                    st.session_state.authenticated = True
+                    st.rerun()
+                else:
+                    st.error(labels['pw_error'])
+        
+        st.markdown("---")
+        st.markdown("#### 📖 1. Introduction (머리말)")
+        intro_bytes = render_pdf_page_as_image(target_pdf, 3)
+        if intro_bytes:
+            st.image(intro_bytes, use_container_width=True)
+            
+    else:
+        # --- 인증 완료 후 정상적인 SOP 뷰어 작동 ---
+        img_bytes = render_pdf_page_as_image(target_pdf, target_page_num)
+        
+        st.markdown(f"### 📖 {selected_title}")
+        
+        if img_bytes:
+            st.image(img_bytes, use_container_width=True)
+        else:
+            st.warning("해당 페이지를 이미지로 불러올 수 없습니다.")
+            
+        st.caption(f"{labels['page_info']}: {target_page_num} / {labels['total_pages']} {total_pages}")
