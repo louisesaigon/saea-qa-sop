@@ -3,33 +3,26 @@ import os
 import pypdf
 import streamlit as st
 
-# 1. 페이지 설정
 st.set_page_config(
     page_title="SOP Smart Handbook - SAE-A", page_icon="🔒", layout="wide"
 )
 
-# 2. 세션 상태 초기화 (비밀번호 인증)
 if "authenticated" not in st.session_state:
   st.session_state.authenticated = False
 
-# 3. 사이드바 설정
 st.sidebar.title("SAE-A QA SOP System")
 lang = st.sidebar.radio(
     "Language / 언어 선택", ["한국어 (Korean)", "English"], index=0
 )
 
-# 4. 보안 인증 화면 (비밀번호: 0101, 엔터 키 지원)
+# 비밀번호 인증 (0101)
 if not st.session_state.authenticated:
   st.title("🔒 SAE-A QA SOP 보안 인증")
   st.write("매뉴얼을 열람하려면 시스템 비밀번호(숫자 4자리)를 입력하십시오.")
 
   with st.form("auth_form"):
     password = st.text_input(
-        "비밀번호 입력",
-        type="password",
-        max_chars=4,
-        value="",
-        placeholder="비밀번호 4자리 입력",
+        "비밀번호 입력", type="password", max_chars=4, placeholder="0101"
     )
     submitted = st.form_submit_button("인증 확인")
     if submitted:
@@ -40,41 +33,34 @@ if not st.session_state.authenticated:
         st.error("비밀번호가 틀렸습니다. (힌트: 0101)")
   st.stop()
 
-# --- 인증 완료 후 메인 로직 ---
 
-# 5. 폴더 내 PDF 파일 자동 감지 로직 (파일명 무관하게 인식)
+# --- PDF 로더 (완벽 방어 로직) ---
 @st.cache_resource
-def get_pdf_reader(selected_lang):
-  pdf_files = glob.glob("*.pdf")
-  if not pdf_files:
-    return None, "현재 폴더에 PDF 파일이 없습니다. (GitHub에 PDF 업로드 필요)"
+def get_pdf(selected_lang):
+  # 현재 폴더 및 상위/하위 폴더까지 .pdf 검색
+  pdf_files = []
+  for root, dirs, files in os.walk("."):
+    for f in files:
+      if f.lower().endswith(".pdf"):
+        pdf_files.append(os.path.join(root, f))
 
-  kr_file, en_file = None, None
+  if not pdf_files:
+    return None, "폴더 내 PDF 파일이 전혀 없습니다."
+
+  target = None
   for f in pdf_files:
     f_lower = f.lower()
-    if (
-        "국문" in f
-        or "kor" in f_lower
-        or "korean" in f_lower
-        or "국문본" in f
-    ):
-      kr_file = f
-    elif "eng" in f_lower or "english" in f_lower or "ver" in f_lower:
-      # 영문 파일 매칭
-      if not en_file:
-        en_file = f
+    if selected_lang == "kr":
+      if "국문" in f or "kor" in f_lower or "korean" in f_lower:
+        target = f
+        break
+    else:
+      if "eng" in f_lower or "english" in f_lower:
+        target = f
+        break
 
-  # 만약 키워드로 못 찾았을 경우 순서대로 배정
-  if not kr_file and len(pdf_files) > 0:
-    kr_file = pdf_files[0]
-  if not en_file and len(pdf_files) > 1:
-    en_file = pdf_files[1]
-  elif not en_file:
-    en_file = pdf_files[0]
-
-  target = kr_file if selected_lang == "kr" else en_file
   if not target:
-    return None, f"매칭되는 PDF 없음 (파일 목록: {pdf_files})"
+    target = pdf_files[0] if selected_lang == "kr" else pdf_files[-1]
 
   try:
     return pypdf.PdfReader(target), target
@@ -82,8 +68,8 @@ def get_pdf_reader(selected_lang):
     return None, str(e)
 
 
-lang_key = "kr" if lang == "한국어 (Korean)" else "en"
-reader, file_info = get_pdf_reader(lang_key)
+lang_code = "kr" if lang == "한국어 (Korean)" else "en"
+reader, file_path = get_pdf(lang_code)
 
 if lang == "한국어 (Korean)":
   st.sidebar.markdown("---")
@@ -92,7 +78,6 @@ else:
   st.sidebar.markdown("---")
   st.sidebar.subheader("SOP Table of Contents")
 
-# 6. 목차 및 페이지 매칭 데이터 정의
 toc_data_kr = [
     ("1. 개요 (Overview)", 3),
     ("2. QA/QC 정의", 4),
@@ -190,8 +175,6 @@ toc_data_en = [
 ]
 
 toc_data = toc_data_kr if lang == "한국어 (Korean)" else toc_data_en
-
-# 7. 목차 선택
 toc_titles = [item[0] for item in toc_data]
 selected_title = st.sidebar.radio("목차를 선택하세요:", toc_titles)
 
@@ -201,7 +184,6 @@ for title, p_num in toc_data:
     selected_page_num = p_num
     break
 
-# 8. 메인 화면 렌더링
 if lang == "한국어 (Korean)":
   st.markdown(
       """
@@ -229,14 +211,11 @@ if reader and isinstance(reader, pypdf.PdfReader):
         height=600,
         disabled=True,
     )
-    st.info(
-        f"현재 표시된 페이지: PDF {selected_page_num}페이지 | 연동 파일:"
-        f" {file_info}"
-    )
+    st.info(f"현재 페이지: PDF {selected_page_num}페이지 | 파일: {file_path}")
   else:
     st.error("해당 페이지를 찾을 수 없습니다.")
 else:
   st.error(
-      f"PDF 파일을 불러오지 못했습니다. 원인: {file_info} (※ 참고: GitHub"
-      " 저장소에 PDF 파일들이 정상적으로 push 되어 있는지 확인해주세요.)"
+      f"PDF 파일 로드 실패: {file_path} (※ Git 저장소 폴더에 PDF 파일들이 함께"
+      " push 되었는지 확인해주세요.)"
   )
